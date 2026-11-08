@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>molvis — 3D molecule viewer</title>
+  <link rel="icon" type="image/svg+xml" href="assets/molsvg.svg">
+  <link rel="stylesheet" href="styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header id="topbar">
+    <div class="brand" title="molvis — PDB / SDF viewer">
+      <img src="assets/molsvg.svg" alt="" width="17" height="17">
+      molvis
+    </div>
+
+    <button id="open-btn" class="btn icon" title="Open a .pdb or .sdf file">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <path d="M1.5 4.5h4.6l1.3 1.7h7.1v6.3H1.5z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+      </svg>
+    </button>
+    <input type="file" id="file-input" accept=".pdb,.ent,.sdf,.sd,.mol,.mdl" hidden>
+
+    <select id="sample-select" title="Load a bundled sample">
+      <option value="">samples…</option>
+      <option value="samples/caffeine.sdf">caffeine (.sdf)</option>
+      <option value="samples/aspirin.sdf">aspirin (.sdf)</option>
+      <option value="samples/ethanol.pdb">ethanol (.pdb)</option>
+      <option value="samples/crambin.pdb">crambin 1CRN (.pdb)</option>
+    </select>
+
+    <div class="vsep"></div>
+
+    <input id="pubchem-input" placeholder="PubChem name / CID…" spellcheck="false" title="Fetch 3D coordinates from PubChem REST">
+    <button id="pubchem-btn" class="btn" title="Fetch 3D SDF from PubChem REST">fetch</button>
+
+    <div class="vsep"></div>
+
+    <select id="style-select" title="Render style">
+      <option value="ball-stick" selected>ball &amp; stick</option>
+      <option value="spacefill">spacefill</option>
+      <option value="sticks">sticks</option>
+    </select>
+
+    <div id="info" title="Current molecule"></div>
+    <button id="build-btn" class="btn icon" title="Toggle build mode (edit molecules)">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+    </button>
+    <button id="settings-btn" class="btn icon" title="AI settings (bring your own key)">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="21" x2="4" y2="14"/><line x1="4" y1="10" x2="4" y2="3"/><line x1="12" y1="21" x2="12" y2="12"/><line x1="12" y1="8" x2="12" y2="3"/><line x1="20" y1="21" x2="20" y2="16"/><line x1="20" y1="12" x2="20" y2="3"/><line x1="1" y1="14" x2="7" y2="14"/><line x1="9" y1="8" x2="15" y2="8"/><line x1="17" y1="16" x2="23" y2="16"/></svg>
+    </button>
+    <button id="details-btn" class="btn icon" title="Toggle details panel">
+      <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+        <circle cx="8" cy="8" r="6.3" fill="none" stroke="currentColor" stroke-width="1.3"/>
+        <line x1="8" y1="7.4" x2="8" y2="11.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+        <circle cx="8" cy="4.9" r="0.95" fill="currentColor" stroke="none"/>
+      </svg>
+    </button>
+    <button id="theme-toggle" class="btn icon" title="Toggle light/dark mode"></button>
+  </header>
+
+  <main id="viewport">
+    <canvas id="scene"></canvas>
+    <div id="buildbar">
+      <div class="bb-group">
+        <button data-tool="add" class="bb-tool selected" title="Add atoms">add</button>
+        <button data-tool="bond" class="bb-tool" title="Create bonds">bond</button>
+        <button data-tool="erase" class="bb-tool" title="Erase atoms">erase</button>
+      </div>
+      <div class="bb-group" id="element-palette">
+        <button data-element="C">C</button>
+        <button data-element="H">H</button>
+        <button data-element="N">N</button>
+        <button data-element="O">O</button>
+        <button data-element="F">F</button>
+        <button data-element="S">S</button>
+        <button data-element="Cl">Cl</button>
+        <button data-element="Br">Br</button>
+        <button data-element="I">I</button>
+        <button data-element="P">P</button>
+      </div>
+      <div class="bb-group">
+        <button data-order="1" title="single bond">—</button>
+        <button data-order="2" title="double bond" class="bb-order2">=</button>
+        <button data-order="3" title="triple bond">≡</button>
+      </div>
+      <div class="bb-group">
+        <button id="build-undo" title="Undo (Ctrl+Z)">undo</button>
+        <button id="build-new" title="Clear the canvas">new</button>
+        <button id="build-export" title="Export as .sdf">export</button>
+        <button id="build-close" class="bb-close" title="Leave build mode">exit</button>
+      </div>
+      <input id="build-name" placeholder="Draft molecule" spellcheck="false" title="Molecule name">
+      <span id="build-status" class="ok"></span>
+      <span id="build-hint"></span>
+    </div>
+    <aside id="info-panel"></aside>
+    <aside id="feedback-card" class="hidden">
+      <div class="fb-head">
+        <span>AI coach</span>
+        <span id="feedback-state"></span>
+      </div>
+      <div id="feedback-body">
+        <div class="fb-note">Enter build mode (pencil icon) to get feedback on your structure.</div>
+      </div>
+      <form id="feedback-form">
+        <input id="feedback-question" placeholder="ask about this structure…" spellcheck="false">
+        <button class="btn" type="submit">ask</button>
+      </form>
+    </aside>
+    <div id="buildbar">
+      <div class="bb-group">
+        <button data-tool="add" class="bb-tool selected" title="Add atoms">add</button>
+        <button data-tool="bond" class="bb-tool" title="Create bonds">bond</button>
+        <button data-tool="erase" class="bb-tool" title="Erase atoms">erase</button>
+      </div>
+      <div class="bb-group" id="element-palette">
+        <button data-element="C">C</button>
+        <button data-element="H">H</button>
+        <button data-element="N">N</button>
+        <button data-element="O">O</button>
+        <button data-element="F">F</button>
+        <button data-element="S">S</button>
+        <button data-element="Cl">Cl</button>
+        <button data-element="Br">Br</button>
+        <button data-element="I">I</button>
+        <button data-element="P">P</button>
+      </div>
+      <div class="bb-group">
+        <button data-order="1" title="single bond">—</button>
+        <button data-order="2" title="double bond">ⱊ</button>
+        <button data-order="3" title="triple bond">≡</button>
+      </div>
+      <div class="bb-group">
+        <button id="build-undo" title="Undo (Ctrl+Z)">undo</button>
+        <button id="build-new" title="Clear the canvas">new</button>
+        <button id="build-export" title="Export as SDF">export</button>
+        <button id="build-close" class="bb-close" title="Leave build mode">exit</button>
+      </div>
+      <input id="build-name" placeholder="Draft molecule" spellcheck="false" title="Molecule name">
+      <span id="build-status" class="ok"></span>
+      <span id="build-hint"></span>
+    </div>
+    <div id="tooltip"></div>
+    <div id="legend"></div>
+    <div id="status"></div>
+    <div id="drop-overlay">
+      <div class="drop-box">Drop a <b>.pdb</b> or <b>.sdf</b> file here</div>
+    </div>
+    <div id="settings-overlay" class="hidden">
+      <div id="settings-dialog">
+        <div class="s-head">
+          <span>AI settings — bring your own key</span>
+          <button id="settings-close" class="ip-close" aria-label="Close">×</button>
+        </div>
+        <div class="s-body">
+          <label>Provider preset
+            <select id="ai-preset">
+              <option value="">choose…</option>
+              <option value="openai">OpenAI</option>
+              <option value="groq">Groq</option>
+              <option value="together">Together</option>
+              <option value="ollama">Ollama (localhost)</option>
+              <option value="custom">Custom OpenAI-compatible</option>
+            </select>
+          </label>
+          <label>Base URL <input id="ai-base" placeholder="https://api.openai.com/v1" spellcheck="false"></label>
+          <label>Model <input id="ai-model" placeholder="gpt-4o-mini" spellcheck="false"></label>
+          <label>API key (optional; sent only to the endpoint above) <input id="ai-key" type="password" placeholder="sk-…" spellcheck="false"></label>
+          <div class="s-row">
+            <button id="ai-save" class="btn">save</button>
+            <button id="ai-clear" class="btn">clear stored key</button>
+            <button id="ai-test" class="btn">test connection</button>
+          </div>
+          <div id="ai-test-result"></div>
+          <p class="s-note">The key is stored in this browser's localStorage and included only in requests to the base URL above. The coach reads your current structure (atoms, bonds, computed valence report) — nothing else. For local Ollama servers, start with <code>OLLAMA_ORIGINS=*</code> so the browser may call it.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script type="module" src="main.js"></script>
+</body>
+</html>
