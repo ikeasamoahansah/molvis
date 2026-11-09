@@ -275,13 +275,67 @@ async function fetchFromPubChem(query) {
     const res = await fetch(
       `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/${kind}/${encodeURIComponent(q)}/SDF?record_type=3d`
     );
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    if (!res.ok) {
+      const detail = await pubChemErrorDetail(res);
+      // Gene/protein names (e.g. "brca1") have no PubChem compound — fall back to PDB
+      if (res.status === 404 && kind === "name" && /No CID/i.test(detail)) {
+        return fetchFromPDB(q);
+      }
+      throw new Error(detail);
+    }
     const text = await res.text();
     if (!/V2000|V3000/.test(text)) throw new Error("unexpected response");
     currentSourceName = `${q}.sdf`;
     await loadText(text, `${q}.sdf`);
-  } catch {
-    showStatus(`Could not fetch "${q}" from PubChem (not found or offline).`, true);
+  } catch (err) {
+    showStatus(`Could not fetch "${q}" from PubChem — ${err.message}.`, true);
+  }
+}
+
+async function pubChemErrorDetail(res) {
+  try {
+    const body = await res.text();
+    const message = body.match(/^Message:\s*(.+)$/m);
+    const detail = body.match(/^Detail:\s*(.+)$/m);
+    const out = [message?.[1], detail?.[1]].filter(Boolean).join(". ").trim();
+    if (out) return out;
+  } catch { /* fall through to status code */ }
+  return `HTTP ${res.status}`;
+}
+
+async function fetchFromPDB(query) {
+  showStatus(`No PubChem compound for "${query}" — searching RCSB PDB…`);
+  try {
+    const res = await fetch("https://search.rcsb.org/rcsbsearch/v2/query", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: {
+          type: "terminal",
+          service: "full_text",
+          parameters: { value: query },
+        },
+        request_options: {
+          results_content_type: ["experimental"],
+          scoring_strategy: "combined",
+        },
+        return_type: "entry",
+      }),
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const ids = (data.result_set || []).map((r) => r.identifier).slice(0, 5);
+    if (!ids.length) throw new Error("no matching entries");
+    for (const id of ids) {
+      const pdbRes = await fetch(`https://files.rcsb.org/download/${id}.pdb`);
+      if (!pdbRes.ok) continue;
+      currentSourceName = `${id}.pdb`;
+      await loadText(await pdbRes.text(), `${id}.pdb`);
+      return;
+    }
+    throw new Error("could not download coordinates");
+  } catch (err) {
+    showStatus(`Could not fetch "${query}" from PDB — ${err.message}.`, true);
   }
 }
 

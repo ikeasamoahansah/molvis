@@ -554,6 +554,22 @@ option { background: var(--panel); color: var(--text); }
 }
 #drop-overlay.visible { display: flex; }
 
+#mobile-gate {
+  position: fixed;
+  inset: 0;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  z-index: 40;
+  text-align: center;
+}
+.gate-box { max-width: 320px; padding: 20px; }
+.gate-box img { opacity: 0.9; margin-bottom: 12px; }
+.gate-box h2 { margin: 0 0 8px; font-size: 17px; }
+.gate-box p { margin: 0; color: var(--text-dim); line-height: 1.6; }
+@media (max-width: 760px) { #mobile-gate { display: flex; } }
+
 .drop-box {
   padding: 28px 40px;
   border: 2px dashed var(--accent);

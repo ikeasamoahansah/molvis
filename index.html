@@ -116,42 +116,16 @@
         <button class="btn" type="submit">ask</button>
       </form>
     </aside>
-    <div id="buildbar">
-      <div class="bb-group">
-        <button data-tool="add" class="bb-tool selected" title="Add atoms">add</button>
-        <button data-tool="bond" class="bb-tool" title="Create bonds">bond</button>
-        <button data-tool="erase" class="bb-tool" title="Erase atoms">erase</button>
-      </div>
-      <div class="bb-group" id="element-palette">
-        <button data-element="C">C</button>
-        <button data-element="H">H</button>
-        <button data-element="N">N</button>
-        <button data-element="O">O</button>
-        <button data-element="F">F</button>
-        <button data-element="S">S</button>
-        <button data-element="Cl">Cl</button>
-        <button data-element="Br">Br</button>
-        <button data-element="I">I</button>
-        <button data-element="P">P</button>
-      </div>
-      <div class="bb-group">
-        <button data-order="1" title="single bond">—</button>
-        <button data-order="2" title="double bond">ⱊ</button>
-        <button data-order="3" title="triple bond">≡</button>
-      </div>
-      <div class="bb-group">
-        <button id="build-undo" title="Undo (Ctrl+Z)">undo</button>
-        <button id="build-new" title="Clear the canvas">new</button>
-        <button id="build-export" title="Export as SDF">export</button>
-        <button id="build-close" class="bb-close" title="Leave build mode">exit</button>
-      </div>
-      <input id="build-name" placeholder="Draft molecule" spellcheck="false" title="Molecule name">
-      <span id="build-status" class="ok"></span>
-      <span id="build-hint"></span>
-    </div>
     <div id="tooltip"></div>
     <div id="legend"></div>
     <div id="status"></div>
+    <div id="mobile-gate">
+      <div class="gate-box">
+        <img src="assets/molsvg.svg" alt="" width="28" height="28">
+        <h2>molvis needs more room</h2>
+        <p>The 3D viewer isn't supported on small screens like phones.<br>Open this page on a desktop or tablet.</p>
+      </div>
+    </div>
     <div id="drop-overlay">
       <div class="drop-box">Drop a <b>.pdb</b> or <b>.sdf</b> file here</div>
     </div>
@@ -187,6 +161,22 @@
     </div>
   </main>
 
-  <script type="module" src="main.js"></script>
+  <script>
+    // Skip WebGL init on small screens — the gate overlay covers the viewport instead.
+    (function () {
+      const MIN_WIDTH = 761;
+      let loaded = false;
+      function tryInit() {
+        if (loaded || window.innerWidth < MIN_WIDTH) return;
+        loaded = true;
+        const s = document.createElement("script");
+        s.type = "module";
+        s.src = "main.js";
+        document.body.appendChild(s);
+      }
+      window.addEventListener("resize", tryInit);
+      tryInit();
+    })();
+  </script>
 </body>
 </html>
