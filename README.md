@@ -16,17 +16,6 @@ python3 -m http.server 8000
 
 (ES modules require HTTP; opening `index.html` over `file://` won't work.)
 
-## Deploying
-
-Host it anywhere static hosting works — Vercel, Netlify, GitHub Pages:
-
-- **Vercel (recommended flow):** push this repo to GitHub, then
-  [import it in the Vercel dashboard](https://vercel.com/new) — framework
-  detection: *Other*, build command: (none), output directory: `.`.
-- **Vercel CLI:** `npx vercel` from this folder.
-- **GitHub Pages:** Settings → Pages → deploy from branch `main`
-  (`/root`).
-
 ## Usage
 
 - **Open button** (folder icon) — pick a `.pdb`, `.ent`, `.sdf`, `.sd`, `.mol`

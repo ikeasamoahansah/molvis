@@ -8,3 +8,6 @@ Thumbs.db
 .tmp-*/
 .tmp-t/
 .node_modules/
+
+# personal notes
+recommendations.md
