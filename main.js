@@ -6,6 +6,7 @@ import { updateLegend } from "./legend.js";
 import { renderInfoPanel, computeStats } from "./info.js";
 import { initBuilder, start as startBuild, stop as stopBuild, isActive, handleSceneClick, undo as undoBuild, resetHistory } from "./builder.js";
 import { valenceReport } from "./chem.js";
+import { measureSelection } from "./measure.js";
 import * as ai from "./ai.js";
 
 // ---------------------------------------------------------------- scene ------
@@ -18,6 +19,8 @@ const infoEl = document.getElementById("info");
 const styleSelect = document.getElementById("style-select");
 const legendEl = document.getElementById("legend");
 const infoPanel = document.getElementById("info-panel");
+const measurePanel = document.getElementById("measure-panel");
+const measureBtn = document.getElementById("measure-btn");
 
 
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -68,6 +71,13 @@ const pointer = new THREE.Vector2();
 const unitSphere = new THREE.SphereGeometry(1, 24, 16);
 const unitCylinder = new THREE.CylinderGeometry(1, 1, 1, 12, 1, true);
 const Y_AXIS = new THREE.Vector3(0, 1, 0);
+
+const measureGroup = new THREE.Group();
+scene.add(measureGroup);
+const measureMaterial = new THREE.MeshStandardMaterial({ color: 0xffc107, roughness: 0.4 });
+const MEASURE_HIGHLIGHT = 0xffa000;
+let measureOn = false;
+let measureSel = [];         // atom indices, in pick order
 
 // ------------------------------------------------------------- building -------
 
@@ -196,6 +206,7 @@ function buildMolecule(mol, style, fit = true) {
   if (fit) fitCamera(group, style);
   updateInfo(mol);
   updateLegend(legendEl, mol);
+  refreshMeasure();
 }
 
 function fitCamera(group, style) {
@@ -251,6 +262,7 @@ async function loadText(text, filename) {
   }
   molecule = mol;
   resetHistory();
+  measureSel = [];
   buildMolecule(mol, styleSelect.value, true);
   document.getElementById("build-name").value = mol.name;
   renderInfoPanel(infoPanel, mol, currentSourceName);
@@ -430,12 +442,21 @@ renderer.domElement.addEventListener("pointerdown", (e) => {
 
 renderer.domElement.addEventListener("pointerup", (e) => {
   if (performance.now() - downT > 450 || Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;
+  if (measureOn) {
+    const mesh = pickAtom(e.clientX, e.clientY);
+    if (mesh) toggleMeasureAtom(mesh.userData.index);
+    return;
+  }
   if (!isActive()) return;
   const mesh = pickAtom(e.clientX, e.clientY);
   handleSceneClick(mesh ? mesh.userData.index : null);
 });
 
 window.addEventListener("keydown", (e) => {
+  if (measureOn && e.key === "Escape") {
+    clearMeasureSelection();
+    return;
+  }
   if (!isActive()) return;
   const tag = e.target.tagName;
   if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
@@ -463,6 +484,89 @@ function tickPick() {
 
 function hideTooltip() { tooltip.classList.remove("show"); }
 requestAnimationFrame(tickPick);
+
+// ------------------------------------------------------------ measure ---------
+
+function setMeasureMode(on) {
+  if (on && isActive()) {
+    stopBuild();
+    buildBtn.classList.remove("selected");
+  }
+  measureOn = on;
+  measureSel = [];
+  measureBtn.classList.toggle("selected", on);
+  measurePanel.classList.toggle("hidden", !on);
+  renderer.domElement.style.cursor = on ? "crosshair" : "";
+  refreshMeasure();
+}
+
+function toggleMeasureAtom(index) {
+  const pos = measureSel.indexOf(index);
+  if (pos >= 0) {
+    measureSel.splice(pos, 1);
+  } else {
+    if (measureSel.length >= 4) measureSel = [];
+    measureSel.push(index);
+  }
+  refreshMeasure();
+}
+
+function clearMeasureSelection() {
+  measureSel = [];
+  refreshMeasure();
+}
+
+function refreshMeasure() {
+  for (const mesh of atomMeshes) {
+    const selected = measureSel.includes(mesh.userData.index);
+    mesh.material.emissive.set(selected ? MEASURE_HIGHLIGHT : 0x000000);
+    mesh.material.emissiveIntensity = selected ? 0.6 : 0;
+  }
+
+  measureGroup.clear();
+  const points = molecule ? measureSel.map((i) => molecule.atoms[i]) : [];
+  for (let i = 0; i + 1 < points.length; i++) {
+    addCylinder(
+      measureGroup,
+      new THREE.Vector3(points[i].x, points[i].y, points[i].z),
+      new THREE.Vector3(points[i + 1].x, points[i + 1].y, points[i + 1].z),
+      0.05,
+      measureMaterial
+    );
+  }
+
+  if (measureOn) renderMeasurePanel(points);
+}
+
+function renderMeasurePanel(points) {
+  const labels = measureSel.map((i) => `${molecule.atoms[i].el}${i + 1}`);
+  const result = measureSelection(points);
+  const value = result
+    ? `${result.value.toFixed(result.decimals)} ${result.unit}`
+    : "—";
+  const kind = result ? result.kind : "Measurement";
+  const hint = !molecule
+    ? "Load a molecule to measure it."
+    : measureSel.length === 0
+      ? "Click 2–4 atoms. Click a picked atom to remove it."
+      : measureSel.length === 1
+        ? "Click another atom to measure a distance."
+        : measureSel.length === 4
+          ? "Click an atom to start a new measurement. Esc clears."
+          : `Click ${measureSel.length === 2 ? "one more atom for an angle" : "one more atom for a dihedral"}. Esc clears.`;
+
+  document.getElementById("measure-body").innerHTML = `
+    <div class="ip-row"><span>Atoms</span><b>${labels.length ? escapeHtml(labels.join(" · ")) : "none"}</b></div>
+    <div class="ip-row"><span>${kind}</span><b>${value}</b></div>
+    <div class="ip-note">${hint}</div>`;
+}
+
+measureBtn.addEventListener("click", () => {
+  setMeasureMode(!measureOn);
+});
+
+document.getElementById("measure-close").addEventListener("click", () => setMeasureMode(false));
+document.getElementById("measure-clear").addEventListener("click", clearMeasureSelection);
 
 // ---------------------------------------------------------------- status ------
 
@@ -516,6 +620,7 @@ buildBtn.addEventListener("click", () => {
     buildBtn.classList.remove("selected");
     return;
   }
+  if (measureOn) setMeasureMode(false);
   if (!molecule) {
     molecule = { name: "Draft molecule", atoms: [], bonds: [], format: "sdf" };
     buildMolecule(molecule, styleSelect.value, false);

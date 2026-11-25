@@ -42,6 +42,20 @@ and **Sticks**. Atom colors follow CPK convention; bonds are split into two
 half-colored cylinders; double/triple bonds from SDF files are fanned out into
 parallel cylinders.
 
+### Measuring
+
+Click the ruler button in the toolbar to enter measure mode, then click atoms
+in order. The picked atoms are highlighted and joined by lines, and the panel
+shows the result for the current selection (values in Å and degrees):
+
+- **2 atoms** — distance
+- **3 atoms** — bond angle
+- **4 atoms** — dihedral (torsion) angle, IUPAC sign convention
+
+Click a picked atom to remove it, click a fifth atom to start a new
+measurement, press Esc or *clear selection* to reset. Measure mode and build
+mode are mutually exclusive.
+
 ### Details panel
 
 Opens automatically on every load (and can be toggled with the details
@@ -116,6 +130,7 @@ computed locally; the model only narrates and suggests.
 - `info.js` — derived molecule description: formula, molar mass, composition
   bar, bond orders, bounding box, chains/residues/ligands for PDB.
 - `legend.js` — the CPK color / bond-order legend.
+- `measure.js` — pure geometry for the measure tool (distance, angle, dihedral).
 - `builder.js` — build-mode editing state machine (add/bond/erase, undo,
   element palette, placement planes).
 - `chem.js` — pure, dependency-free chemistry: valence rules/checks and the

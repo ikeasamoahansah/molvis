@@ -329,6 +329,21 @@ option { background: var(--panel); color: var(--text); }
 
 .ip-body { padding: 10px 12px 12px; display: grid; gap: 12px; }
 
+#measure-panel {
+  position: absolute;
+  top: 46px;
+  right: 12px;
+  z-index: 6;
+  width: 260px;
+  border-radius: var(--radius);
+  background: var(--glass);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(3px);
+  font-size: 12.5px;
+}
+#measure-body { display: grid; gap: 6px; }
+#measure-clear { justify-self: start; border: 1px solid var(--border); }
+
 .ip-section { display: grid; gap: 5px; }
 
 .ip-name { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
